@@ -1,8 +1,6 @@
-#include <msp430.h>
-#include <stdint.h>
+
+#include "configs.h"
 #include "uart.h"
-
-
 
 #define led_2 BIT7
 #define led_1 BIT0
@@ -22,6 +20,34 @@ volatile uint8_t UART_DataRX;
  * Global functions
  *****************************************************************************/
 
+/*-----------------------------------------------------------------------------
+ * Function name:   UART_Init
+ * Description:     Initializes the UART routines on USCIA0
+ * Parameters:      NONE
+ * Returns:         NONE
+ *---------------------------------------------------------------------------*/
+void UART_Init(void)
+{
+	//pg 909
+	UART_DataReady = FALSE;
+	UART_DataRX = 0;
+
+	P3SEL = BIT3 + BIT4;                    // P3.4 & P3.5 = USCI_A0 TXD/RXD
+
+    UCA0CTL1 |= UCSSEL_2; 					// SMCLK
+    #ifndef FAST_CLOCK
+    	UCA0BR0 = 52;                      // 8MHz 9600
+    	UCA0BR1 = 0;
+    	UCA0MCTL = UCBRS_0 + UCBRF_1 + UCOS16;         // Modulation UCBRSx = 2 UCBRFx=0 & oversampling
+    #else
+        UCA0BR0 = 0xEC;                      // 12.1MHz - 9600
+        UCA0BR1 = 0x04;
+        UCA0MCTL = UCBRS_0 + UCBRF_0;         // Modulation UCBRSx = 0 UCBRFx=0
+    #endif
+
+  	UCA0CTL1 &= ~UCSWRST;                   // **Initialize USCI state machine**
+  	UCA0IE |= UCRXIE;                         // Enable USCI_A0 RX interrupt
+}
 
 void UART_SendByte(uint8_t data)
 {

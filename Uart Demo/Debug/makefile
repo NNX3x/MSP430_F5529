@@ -10,6 +10,7 @@ ORDERED_OBJS += \
 $(GEN_CMDS__FLAG) \
 "./uart.obj" \
 "./main.obj" \
+"./devio.obj" \
 "../lnk_msp430f5529.cmd" \
 -l"libmath.a" \
 -l"libc.a" \
@@ -124,8 +125,8 @@ Uart\ Demo.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 # Other Targets
 clean:
 	-$(RM) $(MSP430_EXECUTABLE_OUTPUTS__QUOTED) "Uart Demo.out"
-	-$(RM) "main.pp" "uart.pp" 
-	-$(RM) "main.obj" "uart.obj" 
+	-$(RM) "devio.pp" "main.pp" "uart.pp" 
+	-$(RM) "devio.obj" "main.obj" "uart.obj" 
 	-@echo 'Finished clean'
 	-@echo ' '
 

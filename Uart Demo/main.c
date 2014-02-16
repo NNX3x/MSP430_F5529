@@ -1,6 +1,4 @@
-#include <msp430.h>
-#include <stdint.h>
-#include "uart.h"
+#include "configs.h"
 
 #define led_2 BIT7
 #define led_1 BIT0
@@ -8,19 +6,16 @@
 int main(void)
 {
 	WDTCTL = WDTPW + WDTHOLD;                 // Stop WDT
-	P3SEL = BIT3 + BIT4;                        // P3.4,5 = USCI_A0 TXD/RXD
-	UCA0CTL1 |= UCSWRST;                      // **Put state machine in reset**
-	UCA0CTL1 |= UCSSEL_2;                     // SMCLK
-	UCA0BR0 = 6;                              // 1MHz 9600 (see User's Guide)
-	UCA0BR1 = 0;                              // 1MHz 9600
-	UCA0MCTL = UCBRS_0 + UCBRF_13 + UCOS16;   // Modln UCBRSx=0, UCBRFx=0,
-											  // over sampling
-	UCA0CTL1 &= ~UCSWRST;                   // **Initialize USCI state machine**
-	UCA0IE |= UCRXIE;                         // Enable USCI_A0 RX interrupt
+	DEVIO_Init();
+
+	P2DIR |= BIT2;                            // SMCLK set out to pins
+	P2SEL |= BIT2;
+	P7DIR |= BIT7;                            // MCLK set out to pins
+	P7SEL |= BIT7;
 
 	P1DIR |= led_1;                  //transmit led on dev board
 	P4DIR |= led_2;
-
+	UART_Init();
 
 	//UART_SendString("Goliath Online!");
 

@@ -10,6 +10,7 @@ src/main.obj: D:/Program\ Files\ (x86)/ccsv5/tools/compiler/msp430_4.2.1/include
 src/main.obj: ../src/devio.h
 src/main.obj: ../src/configs.h
 src/main.obj: ../src/spi.h
+src/main.obj: ../src/spi_configs.h
 
 ../src/main.c: 
 ../src/configs.h: 
@@ -21,3 +22,4 @@ D:/Program\ Files\ (x86)/ccsv5/tools/compiler/msp430_4.2.1/include/stdint.h:
 ../src/devio.h: 
 ../src/configs.h: 
 ../src/spi.h: 
+../src/spi_configs.h: 

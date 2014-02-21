@@ -11,26 +11,8 @@
 /******************************************************************************
  * Defines
  *****************************************************************************/
-/* Hardware of software SPI routine select. The software implementation is
- * only for debugging, as the hardware routine is working fine now. */
-//#define SOFT_SPI
 
-#ifdef SOFT_SPI
-    #define SCK_LOW         (P3OUT &= ~DEVIO_P3OUT_SCK)
-    #define SCK_HIGH        (P3OUT |= DEVIO_P3OUT_SCK)
-    #define DELAY_LONG      2
-    #define DELAY_SHORT     0
-
-    void SendDelay(uint8_t lenght)
-    {
-        static volatile uint16_t delay;
-        for(delay = 0; delay < lenght; delay++)
-        {
-        }
-    }
-#endif
-
-
+#define DUMMY_BYTE (0x00)
 /******************************************************************************
  * Global functions
  *****************************************************************************/
@@ -44,31 +26,23 @@
  *---------------------------------------------------------------------------*/
 void SPI_Init(void)
 {
-    #ifndef SOFT_SPI
-        P3SEL |= BIT0 + BIT1 + BIT2;
 
-        UCB0CTL0 |= UCCKPH + UCMSB + UCMST + UCSYNC; // 3-pin, 8-bit SPI master
+	P3SEL |= BIT0 + BIT1 + BIT2;
 
-        // UCMSB Most significant bit first
-        // UCCKPH Accept data on a rising edge.
-        // UCMST Master Mode
-        // UCSYNC Synchronous mode
+	UCB0CTL0 |= UCCKPH + UCMSB + UCMST + UCSYNC; // 3-pin, 8-bit SPI master
 
-        UCB0CTL1 |= UCSSEL_2;           // SMCLK
-        #ifndef FAST_CLOCK
-                UCB0BR0 |= 0x0A;                 // 1MHZ / 10 = 100khz SCLK
-                UCB0BR1 = 0x00;                    // 1MHZ / 10 = 100khz SCLK
-        #else
-                UCB0BR0 |= 0x04;                 // 4 MHZ
-                UCB0BR1 = 0x00;                    //
-        #endif
-        UCB0CTL1 &= ~UCSWRST;           // **Initialize USCI state machine**
+	// UCMSB Most significant bit first
+	// UCCKPH Accept data on a rising edge.
+	// UCMST Master Mode
+	// UCSYNC Synchronous mode
 
-        NRF_SPI_DISABLE;
-    #else
-        NRF_SPI_DISABLE;
-        SCK_LOW;
-    #endif
+	UCB0CTL1 |= UCSSEL_2;           	// SMCLK
+
+	UCB0BR0 |= SPI_CLK_SPEED_SLOW;      // ex: 1MHZ / 10 = 100khz SCLK
+	UCB0BR1 = 0x00;
+	UCB0CTL1 &= ~UCSWRST;              // **Initialize USCI state machine**
+
+
 }
 
 
@@ -81,48 +55,12 @@ void SPI_Init(void)
  *---------------------------------------------------------------------------*/
 uint8_t SPI_SendRawByte(uint8_t data)
 {
-    #ifndef SOFT_SPI
-        while (!(IFG2 & UCA0TXIFG));
+        while (!(UCTXIFG));
         UCB0TXBUF = data;               // Send Data
 
-        while (!(IFG2 & UCB0RXIFG));    // Wait to receive a byte
+        while (!(UCRXIFG));    // Wait to receive a byte
         return UCB0RXBUF;
-    #else
-        uint8_t i = 0;
-        uint8_t bit = 0;
-        uint8_t ret = 0;
 
-        // Start with the clock low
-        SCK_LOW;
-        SendDelay(DELAY_SHORT);
-
-        // Send bits
-        // LSByte to MSByte, MSBit in each byte first
-        for(i = 0; i < 8; i++)
-        {
-            bit = (data >> (7 - i)) & ( 0x01 );
-            if(bit != 0)
-            {
-                P3OUT |= DEVIO_P3OUT_MOSI;
-            } else
-            {
-                P3OUT &= ~DEVIO_P3OUT_MOSI;
-            }
-
-            SendDelay(DELAY_LONG);
-            SCK_HIGH;
-
-            SendDelay(DELAY_LONG);
-            ret |= (((P3IN & DEVIO_P3IN_MISO)  << 1) >>  i);
-            SCK_LOW;
-
-            SendDelay(DELAY_SHORT);
-        }
-
-        P3OUT &= ~DEVIO_P3OUT_MOSI;
-        SendDelay(DELAY_LONG);
-        return ret;
-    #endif
 }
 
 
@@ -137,33 +75,12 @@ uint8_t SPI_SendByte(uint8_t data)
 {
     uint8_t ret;
 
-    NRF_SPI_ENABLE;
+   // NRF_SPI_ENABLE;
     ret = SPI_SendRawByte(data);
-    NRF_SPI_DISABLE;
+ //   NRF_SPI_DISABLE;
 
     return ret;
 }
-
-
-/*-----------------------------------------------------------------------------
- * Function name:   SPI_SendCommand
- * Description:     Sends out a command byte, followed by a data byte. This
- *                  function does modify the SPI select line.
- * Parameters:      data - data byte to send
- * Returns:         byte received while sending out the data byte
- *---------------------------------------------------------------------------*/
-uint8_t SPI_SendCommand(uint8_t command, uint8_t data)
-{
-    uint8_t ret;
-
-    NRF_SPI_ENABLE;
-    (void) SPI_SendRawByte(command);
-    ret = SPI_SendRawByte(data);
-    NRF_SPI_DISABLE;
-
-    return ret;
-}
-
 
 /*-----------------------------------------------------------------------------
  * Function name:   SPI_SendBuffer
@@ -173,7 +90,7 @@ uint8_t SPI_SendCommand(uint8_t command, uint8_t data)
  *                  command, followed by the results of the buffer sending.
  * Parameters:      command - First byte to send, the command byte.
  *                  buffer - Pointer to the buffer to send out.
- *                  length - Number of bytes in the buffer to send outl
+ *                  length - Number of bytes in the buffer to send out
  *                  ret - Return buffer pointer. This can either be NULL, or it
  *                      needs to be length +1.
  * Returns:         NONE
@@ -183,7 +100,6 @@ void SPI_SendBuffer(uint8_t command, uint8_t* buffer, uint8_t length, uint8_t* r
     uint8_t i;
     uint8_t retByte;
 
-    NRF_SPI_ENABLE;
     retByte = SPI_SendRawByte(command); // Send first byte, the command
     if(ret != NULL)
     {
@@ -199,7 +115,6 @@ void SPI_SendBuffer(uint8_t command, uint8_t* buffer, uint8_t length, uint8_t* r
         }
     }
 
-    NRF_SPI_DISABLE;
 }
 
 
@@ -220,12 +135,10 @@ void SPI_GetBuffer(uint8_t command, uint8_t* ret, uint8_t num_bytes)
 {
     uint8_t i;
 
-    NRF_SPI_ENABLE;
     (void) SPI_SendRawByte(command);
 
     for(i = 0; i < num_bytes; i++)
     {
        ret[i] = SPI_SendRawByte(DUMMY_BYTE);
     }
-    NRF_SPI_DISABLE;
 }
